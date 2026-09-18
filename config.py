@@ -146,8 +146,9 @@ PHRASE_ROUTE_TEMPLATE = "Bus {route}"
 # --------------------------------------------------------------------------
 # ROUTE LOOKUP & DATA
 # --------------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
 CITY = "vijayawada"  # Active city data to load
-ROUTES_DATA_DIR = Path("data/routes")  # Directory containing city CSV datasets
+ROUTES_DATA_DIR = BASE_DIR / "data" / "routes"  # Directory containing city CSV datasets
 PHRASE_ROUTE_WITH_DESTINATION_TEMPLATE = "Bus {route} to {destination}"
 
 
@@ -167,7 +168,10 @@ BUDGET_PREPROCESS = 0.15
 BUDGET_OCR = 0.70
 BUDGET_FEEDBACK = 0.40
 
-LOG_PATH = Path("logs/run_timings.csv")
+# On serverless (Vercel / AWS Lambda), the root filesystem is read-only — write to /tmp instead
+_is_serverless = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+LOG_PATH = Path("/tmp/logs/run_timings.csv") if _is_serverless else (BASE_DIR / "logs" / "run_timings.csv")
+
 
 # --------------------------------------------------------------------------
 # POWER MANAGEMENT

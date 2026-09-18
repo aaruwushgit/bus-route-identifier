@@ -30,7 +30,12 @@ from routes import RouteLookup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("bus_route.web")
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+BASE_DIR = Path(__file__).resolve().parent
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB max upload
 
 # Initialize RouteLookup ONCE at startup (zero-disk read hot path rule)
@@ -39,13 +44,17 @@ route_lookup = RouteLookup(routes_dir=config.ROUTES_DATA_DIR, city=config.CITY)
 route_lookup.startup_complete = True
 haptic = feedback.HapticMotor()
 
-# Ensure timing log exists
-config.LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-if not config.LOG_PATH.exists():
-    with open(config.LOG_PATH, "w", newline="") as f:
-        csv.writer(f).writerow(
-            ["timestamp", "capture_s", "preprocess_s", "ocr_s", "feedback_s", "total_s", "route", "confidence"]
-        )
+# Ensure timing log exists (gracefully handle read-only filesystems on serverless)
+try:
+    config.LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not config.LOG_PATH.exists():
+        with open(config.LOG_PATH, "w", newline="") as f:
+            csv.writer(f).writerow(
+                ["timestamp", "capture_s", "preprocess_s", "ocr_s", "feedback_s", "total_s", "route", "confidence"]
+            )
+except Exception as e:
+    logger.warning("Could not initialize timing log at %s (read-only filesystem): %s", config.LOG_PATH, e)
+
 
 
 def _encode_jpeg_base64(img: np.ndarray, max_dim: int = 640, quality: int = 80) -> str:
