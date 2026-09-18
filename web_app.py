@@ -283,7 +283,7 @@ def get_config():
 @app.route("/api/samples", methods=["GET"])
 def list_samples():
     """Lists available test images in test_images/ for one-click testing."""
-    test_dir = Path("test_images")
+    test_dir = BASE_DIR / "test_images"
     if not test_dir.exists():
         return jsonify([])
     valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -328,7 +328,7 @@ def identify_sample():
     if not filename:
         return jsonify({"error": "Missing 'filename' parameter"}), 400
 
-    safe_path = Path("test_images") / Path(filename).name
+    safe_path = BASE_DIR / "test_images" / Path(filename).name
     if not safe_path.exists() or not safe_path.is_file():
         return jsonify({"error": f"Sample file '{filename}' not found"}), 404
 
@@ -351,11 +351,11 @@ def run_benchmark():
     If truth.csv exists, calculates real accuracy %;
     otherwise returns 'N/A' for accuracy without inventing any number.
     """
-    test_dir = Path("test_images")
+    test_dir = BASE_DIR / "test_images"
     if not test_dir.exists():
         return jsonify({"error": "test_images directory does not exist"}), 400
 
-    truth_file = Path("test_images/truth.csv")
+    truth_file = BASE_DIR / "test_images" / "truth.csv"
     truth: Dict[str, str] = {}
     has_ground_truth = False
     if truth_file.exists():
