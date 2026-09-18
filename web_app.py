@@ -19,6 +19,7 @@ from typing import Dict, Any, Optional
 import cv2
 import numpy as np
 from flask import Flask, request, jsonify, render_template
+from werkzeug.exceptions import HTTPException
 
 import config
 import feedback
@@ -250,8 +251,14 @@ def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0) -> Dict
 
 
 @app.route("/")
+@app.route("/api/index")
+@app.route("/api/index/")
+@app.route("/api/index.py")
+@app.route("/api")
+@app.route("/api/")
 def index():
     return render_template("index.html")
+
 
 
 @app.route("/api/config", methods=["GET"])
@@ -423,6 +430,8 @@ def run_benchmark():
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    if isinstance(e, HTTPException):
+        return jsonify({"error": e.description}), e.code
     logger.exception("Server error: %s", e)
     return jsonify({"error": str(e)}), 500
 
