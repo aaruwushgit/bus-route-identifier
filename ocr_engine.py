@@ -145,8 +145,27 @@ def _extract_with_tesseract(binary_image: np.ndarray, raw_frame: Optional[np.nda
         elapsed = time.monotonic() - t0
 
         return OcrResult(raw_text, route, mean_conf, "tesseract", elapsed)
+    except pytesseract.pytesseract.TesseractNotFoundError as e:
+        # This is the one case where "fall back to Windows OCR" is actually the
+        # right call — the binary genuinely isn't at the resolved path.
+        logger.warning(
+            "Tesseract binary not found at '%s' (%s). Falling back to Windows OCR "
+            "with degraded (estimated, non-numeric) confidence. Fix: install "
+            "Tesseract-OCR and/or add it to PATH — see check_tesseract.py.",
+            config.TESSERACT_CMD, e,
+        )
+        return _extract_with_winocr(binary_image, raw_frame=raw_frame)
     except Exception as e:
-        logger.info("Tesseract not available on host (%s). Falling back to Windows OCR...", e)
+        # Any other failure (bad image array, missing eng.traineddata, a
+        # permissions error, etc.) is a real bug, not a "Tesseract isn't
+        # installed" situation — log it loudly and with a traceback instead of
+        # silently reporting it as the same thing. Still fall back so one bad
+        # frame doesn't crash the request, but this must be visible in logs.
+        logger.error(
+            "Tesseract OCR pass raised an unexpected error (NOT a 'not found' "
+            "issue — investigate this): %s: %s",
+            type(e).__name__, e, exc_info=True,
+        )
         return _extract_with_winocr(binary_image, raw_frame=raw_frame)
 
 

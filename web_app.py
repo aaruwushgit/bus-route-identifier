@@ -45,6 +45,27 @@ route_lookup = RouteLookup(routes_dir=config.ROUTES_DATA_DIR, city=config.CITY)
 route_lookup.startup_complete = True
 haptic = feedback.HapticMotor()
 
+# --- STARTUP OCR ENGINE CHECK ---
+# Print this loudly and unconditionally: if the server is silently running on
+# the Windows OCR fallback instead of Tesseract, that must be obvious the
+# moment you start it, not something discovered by squinting at a UI badge
+# after a failed demo upload.
+try:
+    import pytesseract as _pt
+    _tess_version = _pt.get_tesseract_version()
+    logger.info("OCR ENGINE READY: Tesseract %s at '%s'", _tess_version, config.TESSERACT_CMD)
+except Exception as e:
+    logger.warning(
+        "=" * 70 + "\n"
+        "OCR ENGINE: Tesseract is NOT available (%s: %s).\n"
+        "The app will run on the Windows OCR fallback instead, which has no\n"
+        "native confidence score and is generally less accurate.\n"
+        "Resolved TESSERACT_CMD was: '%s'\n"
+        "Run `python check_tesseract.py` for a focused diagnosis, or install\n"
+        "Tesseract-OCR and ensure it's on PATH.\n" + "=" * 70,
+        type(e).__name__, e, config.TESSERACT_CMD,
+    )
+
 # Ensure timing log exists (gracefully handle read-only filesystems on serverless)
 try:
     config.LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
