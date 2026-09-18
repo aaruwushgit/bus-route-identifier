@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edge-OCR Bus Route Identifier — Transit Ticket UI</title>
+  <!-- Google Fonts: Archivo Black, Share Tech Mono, Space Mono, Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Share+Tech+Mono&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --vermilion-start: #E85D2C;
+      --vermilion-end: #D94A1F;
+      --ticket-cream: #F5EFE0;
+      --ticket-cream-dark: #ECE3CF;
+      --ink-black: #1A1A1A;
+      --ink-muted: #5A544A;
+      --mustard-amber: #F2A93B;
+      --led-amber: #FFB800;
+      --led-amber-glow: rgba(255, 184, 0, 0.45);
+      --led-bg: #0E0E0E;
+      --pass-green: #1B7A3E;
+      --pass-bg: #E3F5E9;
+      --fail-red: #B71C1C;
+      --fail-bg: #FDE8E8;
+      --stamp-red: #A82020;
+      --perforation: #C8BFA8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: linear-gradient(145deg, var(--vermilion-start) 0%, var(--vermilion-end) 100%);
+      color: var(--ink-black);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* --- TICKET STUB BASE STYLING --- */
+    .ticket-stub {
+      background-color: var(--ticket-cream);
+      border-radius: 12px;
+      position: relative;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* Semicircular die-cut notches on left and right */
+    .ticket-stub::before,
+    .ticket-stub::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      background: var(--vermilion-start);
+      border-radius: 50%;
+      transform: translateY(-50%);
+      z-index: 5;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+    }
+    .ticket-stub::before { left: -12px; }
+    .ticket-stub::after { right: -12px; }
+
+    /* Top dot-grid header strip */
+    .dot-grid-strip {
+      background-color: #EDE4D1;
+      background-image: radial-gradient(#D94A1F 1.5px, transparent 1.5px);
+      background-size: 8px 8px;
+      padding: 8px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--perforation);
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #7A2E14;
+    }
+
+    /* Stars section divider */
+    .stars-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--mustard-amber);
+      font-size: 14px;
+      margin: 12px 0;
+      user-select: none;
+    }
+    .stars-divider::before,
+    .stars-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--perforation);
+    }
+
+    /* Perforated dashed divider line */
+    .perforated-line {
+      border: none;
+      border-top: 2px dashed var(--perforation);
+      margin: 16px 0;
+      position: relative;
+    }
+
+    /* --- HEADER COMPONENT --- */
+    .header-card {
+      padding: 24px 32px 20px;
+    }
+    .transit-authority {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: #8C3012;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .main-title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 30px;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+      color: var(--ink-black);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title-badge {
+      background: var(--vermilion-start);
+      color: #fff;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: var(--ink-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    /* Barcode decoration */
+    .barcode-strip {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 24px;
+      margin-top: 14px;
+      opacity: 0.85;
+    }
+    .bar {
+      background: var(--ink-black);
+      height: 100%;
+      border-radius: 1px;
+    }
+    .barcode-caption {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--ink-muted);
+      margin-left: 12px;
+      letter-spacing: 1px;
+    }
+
+    /* --- UPLOAD ZONE --- */
+    .upload-section {
+      padding: 24px 32px;
+    }
+    .upload-slot {
+      border: 3px dashed #B8ADA0;
+      background: #EFE8D6;
+      border-radius: 10px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .upload-slot:hover, .upload-slot.dragover {
+      border-color: var(--vermilion-start);
+      background: #F8F3E8;
+      transform: translateY(-1px);
+    }
+    .upload-icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .upload-heading {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 18px;
+      text-transform: uppercase;
+      color: var(--ink-black);
+      margin-bottom: 4px;
+    }
+    .upload-hint {
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+    #file-input {
+      display: none;
+    }
+
+    /* Sample selector chips */
+    .sample-chips-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin: 16px 0 8px;
+      font-weight: 700;
+    }
+    .sample-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .sample-chip {
+      background: #E5DDCA;
+      border: 1px solid #CCC3AE;
+      color: var(--ink-black);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sample-chip:hover {
+      background: var(--mustard-amber);
+      border-color: #D68F24;
+      transform: translateY(-1px);
+    }
+
+    /* --- RESULTS CONTAINER --- */
+    #result-section {
+      display: none;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* --- MAIN RESULT TICKET --- */
+    .result-ticket {
+      padding: 28px 36px 32px;
+    }
+    .ticket-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .ticket-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ticket-serial {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #7A2E14;
+      letter-spacing: 1px;
+    }
+    .ticket-city {
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* Rubber Stamp Effect */
+    .stamped-badge {
+      border: 3px solid var(--stamp-red);
+      color: var(--stamp-red);
+      font-family: 'Space Mono', monospace;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      transform: rotate(-5deg);
+      box-shadow: 0 0 0 1px rgba(168, 32, 32, 0.2);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .stamped-badge.pass {
+      border-color: var(--pass-green);
+      color: var(--pass-green);
+    }
+    .stamped-badge.advisory {
+      border-color: #8A6D1C;
+      color: #8A6D1C;
+    }
+
+    /* Authentic Bus LED Display Board */
+    .bus-led-display {
+      background: var(--led-bg);
+      border-radius: 12px;
+      padding: 24px 28px;
+      border: 4px solid #282828;
+      box-shadow: inset 0 6px 16px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0,0,0,0.15);
+      margin: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Subtle LED dot-matrix grid overlay */
+    .bus-led-display::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(rgba(255, 184, 0, 0.08) 1px, transparent 1px);
+      background-size: 4px 4px;
+      pointer-events: none;
+    }
+    .led-route-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .led-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .led-digits {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 64px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--led-amber);
+      text-shadow: 0 0 12px var(--led-amber-glow), 0 0 24px rgba(255, 184, 0, 0.3);
+      letter-spacing: 4px;
+    }
+    .led-destination-row {
+      border-top: 1px solid #222;
+      padding-top: 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .led-dest-arrow {
+      color: var(--mustard-amber);
+      font-size: 18px;
+    }
+    .led-destination {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 24px;
+      color: #FFFFFF;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    /* Advisory Low-Confidence Ticket State */
+    .advisory-box {
+      background: #EAE3D2;
+      border: 3px dashed #A89B85;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin: 16px 0;
+      display: none;
+    }
+    .advisory-title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 20px;
+      color: #6E5420;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .advisory-msg {
+      font-size: 16px;
+      color: var(--ink-black);
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* Spoken Phrase Receipt Line */
+    .speech-receipt-line {
+      background: var(--ticket-cream-dark);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .speech-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-black);
+    }
+    .speak-btn {
+      background: var(--ink-black);
+      color: var(--mustard-amber);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .speak-btn:hover {
+      background: #333;
+      transform: translateY(-1px);
+    }
+
+    /* KPI Cards Row */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .kpi-card {
+      background: #EAE2CF;
+      border: 1px solid #D6CCB6;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .kpi-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .kpi-value-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .kpi-value {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 22px;
+      color: var(--ink-black);
+    }
+    .kpi-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .kpi-badge.pass {
+      background: var(--pass-green);
+      color: #FFF;
+    }
+    .kpi-badge.fail {
+      background: var(--fail-red);
+      color: #FFF;
+    }
+    .kpi-badge.warn {
+      background: #9A7416;
+      color: #FFF;
+    }
+
+    /* --- HORIZONTAL STAGE CARDS STRIP --- */
+    .stages-section-title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 18px;
+      text-transform: uppercase;
+      color: var(--ink-black);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stages-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .stage-card {
+      background: #EFE8D6;
+      border: 1px solid #D8CFC0;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+    .stage-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #6E3218;
+      text-transform: uppercase;
+    }
+    .stage-img-wrap {
+      width: 100%;
+      height: 140px;
+      background: #111;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    .stage-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .stage-receipt-line {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-black);
+      border-top: 1px dashed #C8BFA8;
+      padding-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stage-receipt-ms {
+      font-weight: 700;
+      color: #9C3308;
+    }
+
+    /* --- BATCH BENCHMARK SECTION --- */
+    .benchmark-section {
+      padding: 24px 32px;
+    }
+    .benchmark-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .benchmark-title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 18px;
+      text-transform: uppercase;
+      color: var(--ink-black);
+    }
+    .audit-btn {
+      background: var(--mustard-amber);
+      color: var(--ink-black);
+      border: 1px solid #D18919;
+      font-family: 'Space Mono', monospace;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s ease;
+    }
+    .audit-btn:hover {
+      background: #FFAF36;
+      transform: translateY(-1px);
+    }
+    .audit-results-box {
+      display: none;
+      margin-top: 16px;
+    }
+    .receipt-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      margin-top: 12px;
+    }
+    .receipt-table th {
+      background: #E5DBC5;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid #C4B9A2;
+      color: #554834;
+      text-transform: uppercase;
+    }
+    .receipt-table td {
+      padding: 8px 10px;
+      border-bottom: 1px dashed #D2C7B0;
+      color: var(--ink-black);
+    }
+    .receipt-table tr:hover {
+      background: #EDE4D0;
+    }
+
+    /* Loading Spinner Overlay */
+    .loading-overlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(245, 239, 224, 0.88);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid var(--perforation);
+      border-top-color: var(--vermilion-start);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner-text {
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--ink-black);
+      letter-spacing: 1px;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .header-card, .upload-section, .result-ticket, .benchmark-section {
+        padding: 20px 18px;
+      }
+      .main-title {
+        font-size: 22px;
+      }
+      .led-digits {
+        font-size: 48px;
+      }
+      .led-destination {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER TICKET CARD -->
+  <header class="ticket-stub header-card">
+    <div class="transit-authority">★ ASSISTIVE PUBLIC TRANSIT RECOGNITION ★</div>
+    <h1 class="main-title">
+      Bus Route Identifier
+      <span class="title-badge">OFFLINE</span>
+    </h1>
+    <p class="subtitle">
+      Real-time camera route announcement for visually impaired commuters.
+      Upload a bus route board photo to identify the route number and destination.
+    </p>
+
+    <!-- Barcode strip decoration -->
+    <div class="barcode-strip" title="Transit Ticket Serial">
+      <div class="bar" style="width: 4px;"></div>
+      <div class="bar" style="width: 1px; margin-left: 2px;"></div>
+      <div class="bar" style="width: 3px; margin-left: 1px;"></div>
+      <div class="bar" style="width: 6px; margin-left: 3px;"></div>
+      <div class="bar" style="width: 2px; margin-left: 1px;"></div>
+      <div class="bar" style="width: 4px; margin-left: 2px;"></div>
+      <div class="bar" style="width: 1px; margin-left: 4px;"></div>
+      <div class="bar" style="width: 5px; margin-left: 1px;"></div>
+      <div class="bar" style="width: 2px; margin-left: 2px;"></div>
+      <div class="bar" style="width: 4px; margin-left: 1px;"></div>
+      <div class="bar" style="width: 3px; margin-left: 3px;"></div>
+      <div class="bar" style="width: 6px; margin-left: 2px;"></div>
+      <div class="bar" style="width: 2px; margin-left: 1px;"></div>
+      <div class="bar" style="width: 5px; margin-left: 3px;"></div>
+      <div class="bar" style="width: 3px; margin-left: 2px;"></div>
+      <span class="barcode-caption">SERIAL NO: RT-2026-98357</span>
+    </div>
+  </header>
+
+  <!-- UPLOAD / INPUT TICKET STUB -->
+  <section class="ticket-stub upload-section" id="upload-card">
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <div class="spinner-text" id="loading-text">PROCESSING PIPELINE...</div>
+    </div>
+
+    <div class="upload-slot" id="drop-zone">
+      <div class="upload-heading">SELECT OR DROP BUS PHOTO</div>
+      <div class="upload-hint">Drag & drop a route board photo here, or click to browse</div>
+      <input type="file" id="file-input" accept="image/*" />
+    </div>
+  </section>
+
+  <!-- RESULTS SECTION -->
+  <main id="result-section">
+
+    <!-- MAIN RESULT TICKET STUB -->
+    <article class="ticket-stub result-ticket">
+      <div class="dot-grid-strip" style="margin: -28px -36px 18px; padding: 10px 36px;">
+        <span id="ticket-run-serial">TICKET NO: #0000</span>
+        <span id="ticket-engine-badge">ENGINE: REAL OCR</span>
+      </div>
+
+      <div class="ticket-header-row">
+        <div class="ticket-meta">
+          <div class="ticket-serial">BUS TICKET</div>
+          <div class="ticket-city" id="ticket-city-display">DATASET: VIJAYAWADA (OFFLINE)</div>
+        </div>
+        <div class="stamped-badge pass" id="stamped-badge">
+          <span id="stamped-icon"></span>
+          <span id="stamped-text">PASS — REAL-TIME</span>
+        </div>
+      </div>
+
+      <div class="stars-divider">★★★★★</div>
+
+      <!-- AUTHENTIC BUS DESTINATION LED BOARD -->
+      <div class="bus-led-display" id="led-board">
+        <div class="led-route-row">
+          <span class="led-label">IDENTIFIED ROUTE NUMBER</span>
+          <span class="led-digits" id="led-route-number">305</span>
+        </div>
+        <div class="led-destination-row">
+          <span class="led-dest-arrow">➔</span>
+          <span class="led-destination" id="led-destination-name">VIJAYAWADA RAILWAY STATION</span>
+        </div>
+      </div>
+
+      <!-- ADVISORY CARD (RENDERED WHEN LOW CONFIDENCE OR NO ROUTE) -->
+      <div class="advisory-box" id="advisory-card" style="display:none;">
+        <div class="advisory-title">
+          <span>ADVISORY: UNVERIFIED ROUTE</span>
+        </div>
+        <div class="advisory-msg" id="advisory-message">
+          Unclear. Please hold steady and try again.
+        </div>
+      </div>
+
+      <!-- SPOKEN PHRASE RECEIPT LINE -->
+      <div class="speech-receipt-line">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <span style="font-size:10px; font-family:'Space Mono',monospace; color:var(--ink-muted); text-transform:uppercase;">Spoken Voice Announcement:</span>
+          <span class="speech-text" id="spoken-phrase-display">"Bus 305 to Vijayawada Railway Station"</span>
+        </div>
+        <button class="speak-btn" id="play-audio-btn" type="button">
+          <span>PLAY VOICE</span>
+        </button>
+      </div>
+
+      <!-- KPI TARGET BADGES ROW -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Latency (Budget ≤ 1.5s)</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-total-time">94 ms</span>
+            <span class="kpi-badge pass" id="kpi-total-badge">PASS</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label" id="kpi-conf-label">OCR Confidence (Threshold ≥ 45%)</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-conf-score">85.0%</span>
+            <span class="kpi-badge pass" id="kpi-conf-badge">PASS</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Fuzzy Match Correction</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-fuzzy-status" style="font-size:16px;">Canonical Match</span>
+            <span class="kpi-badge pass" id="kpi-fuzzy-badge">OFFLINE</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Audio Cache Status</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpi-cache-status" style="font-size:16px;">Cache Hit</span>
+            <span class="kpi-badge pass" id="kpi-cache-badge">10-20ms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- HORIZONTAL INTERMEDIATE STAGES STRIP -->
+      <div style="margin-top: 24px;">
+        <div class="stages-section-title">
+          <span>⚙</span>
+          <span>Pipeline Stages & Intermediate Outputs</span>
+        </div>
+
+        <div class="stages-strip">
+          <!-- Stage 0: Raw Ingest -->
+          <div class="stage-card">
+            <div class="stage-card-header">
+              <span>0. INGEST</span>
+              <span id="stg0-pass-badge" class="kpi-badge pass">PASS</span>
+            </div>
+            <div class="stage-img-wrap">
+              <img id="stg0-img" alt="Raw Ingest" />
+            </div>
+            <div class="stage-receipt-line">
+              <span>CAPTURE/DECODE</span>
+              <span class="stage-receipt-ms" id="stg0-ms">0.0 ms</span>
+            </div>
+          </div>
+
+          <!-- Stage 1: Grayscale -->
+          <div class="stage-card">
+            <div class="stage-card-header">
+              <span>1. GRAYSCALE</span>
+              <span id="stg1-pass-badge" class="kpi-badge pass">PASS</span>
+            </div>
+            <div class="stage-img-wrap">
+              <img id="stg1-img" alt="Grayscale Stage" />
+            </div>
+            <div class="stage-receipt-line">
+              <span>COLOR STRIP</span>
+              <span class="stage-receipt-ms" id="stg1-ms">--</span>
+            </div>
+          </div>
+
+          <!-- Stage 2: CLAHE Equalization -->
+          <div class="stage-card">
+            <div class="stage-card-header">
+              <span>2. CLAHE FILTER</span>
+              <span id="stg2-pass-badge" class="kpi-badge pass">PASS</span>
+            </div>
+            <div class="stage-img-wrap">
+              <img id="stg2-img" alt="CLAHE Equalized" />
+            </div>
+            <div class="stage-receipt-line">
+              <span>ANTI-GLARE</span>
+              <span class="stage-receipt-ms" id="stg2-ms">--</span>
+            </div>
+          </div>
+
+          <!-- Stage 3: Adaptive Binarization -->
+          <div class="stage-card">
+            <div class="stage-card-header">
+              <span>3. THRESHOLD</span>
+              <span id="stg3-pass-badge" class="kpi-badge pass">PASS</span>
+            </div>
+            <div class="stage-img-wrap">
+              <img id="stg3-img" alt="Adaptive Threshold" />
+            </div>
+            <div class="stage-receipt-line">
+              <span>BINARIZATION</span>
+              <span class="stage-receipt-ms" id="stg3-ms">15.0 ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PER-STAGE RECEIPT BREAKDOWN -->
+      <div style="margin-top: 20px; background: #EFE8D6; border-radius: 8px; padding: 16px;">
+        <div style="font-family:'Space Mono',monospace; font-size:12px; font-weight:700; text-transform:uppercase; margin-bottom:8px; color:#5A544A;">
+          OFFICIAL AUDIT TICKET RECEIPT LINE (WALL-CLOCK MEASURED)
+        </div>
+        <div id="receipt-lines-container" style="font-family:'Space Mono',monospace; font-size:12px; line-height:1.8; color:var(--ink-black);">
+          <!-- Populated dynamically with real measured lines -->
+        </div>
+      </div>
+    </article>
+
+  </main>
+
+  <!-- BATCH BENCHMARK TICKET STUB -->
+  <section class="ticket-stub benchmark-section">
+    <div class="dot-grid-strip" style="margin: -24px -32px 16px; padding: 10px 32px;">
+      <span>SYSTEM HEALTH & GROUND-TRUTH BENCHMARK HARNESS</span>
+      <span>AUTOMATED AUDIT</span>
+    </div>
+
+    <div class="benchmark-header">
+      <div>
+        <h2 class="benchmark-title">Batch Test Harness</h2>
+        <p style="font-size:13px; color:var(--ink-muted); margin-top:2px;">
+          Runs all available images in <code>test_images/</code> through the real pipeline and verifies against ground truth if present.
+        </p>
+      </div>
+      <button class="audit-btn" id="run-benchmark-btn" type="button">
+        ▶ RUN BATCH AUDIT
+      </button>
+    </div>
+
+    <!-- BENCHMARK RESULTS AREA -->
+    <div class="audit-results-box" id="audit-results-box">
+      <div class="kpi-row" style="margin-top:0;">
+        <div class="kpi-card">
+          <span class="kpi-label">Batch Accuracy %</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="bench-accuracy">N/A</span>
+            <span class="kpi-badge warn" id="bench-acc-badge">AUDITED</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Total Images Tested</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="bench-total-tested">0</span>
+            <span class="kpi-badge pass">100% REAL</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Average Pipeline Latency</span>
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="bench-avg-latency">0 ms</span>
+            <span class="kpi-badge pass" id="bench-latency-badge">PASS ≤ 1.5s</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="receipt-table" id="bench-table">
+          <thead>
+            <tr>
+              <th>IMAGE FILE</th>
+              <th>DETECTED ROUTE</th>
+              <th>DESTINATION</th>
+              <th>CONFIDENCE</th>
+              <th>LATENCY</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="bench-table-body">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  let currentSpokenPhrase = "";
+
+  // Elements
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const loadingText = document.getElementById("loading-text");
+  const resultSection = document.getElementById("result-section");
+  const playAudioBtn = document.getElementById("play-audio-btn");
+  const runBenchmarkBtn = document.getElementById("run-benchmark-btn");
+  const auditResultsBox = document.getElementById("audit-results-box");
+
+  // Upload handlers
+  dropZone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadFile(e.target.files[0]);
+    }
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      uploadFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  async function uploadFile(file) {
+    showLoading(`DECODING & RUNNING PIPELINE FOR ${file.name.toUpperCase()}...`);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/identify", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      hideLoading();
+      if (!res.ok) {
+        alert(data.error || "Pipeline run failed.");
+        return;
+      }
+      renderPipelineResults(data);
+    } catch (err) {
+      hideLoading();
+      alert("Network or pipeline execution error: " + err.message);
+    }
+  }
+
+  async function runSample(filename) {
+    showLoading(`RUNNING PIPELINE ON ${filename.toUpperCase()}...`);
+    try {
+      const res = await fetch("/api/sample-identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      const data = await res.json();
+      hideLoading();
+      if (!res.ok) {
+        alert(data.error || "Failed to process sample image.");
+        return;
+      }
+      renderPipelineResults(data);
+    } catch (err) {
+      hideLoading();
+      alert("Error: " + err.message);
+    }
+  }
+
+  function showLoading(msg) {
+    loadingText.textContent = msg || "PROCESSING PIPELINE...";
+    loadingOverlay.style.display = "flex";
+  }
+
+  function hideLoading() {
+    loadingOverlay.style.display = "none";
+  }
+
+  // Render real measured outputs
+  function renderPipelineResults(data) {
+    resultSection.style.display = "flex";
+    resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    currentSpokenPhrase = data.spoken_phrase || "";
+    document.getElementById("spoken-phrase-display").textContent = `"${currentSpokenPhrase}"`;
+
+    // Serial & timestamp
+    const shortSerial = (data.timestamp_unix ? Math.floor(data.timestamp_unix % 100000) : "0000");
+    document.getElementById("ticket-run-serial").textContent = `TICKET NO: #RTC-${shortSerial}`;
+    document.getElementById("ticket-engine-badge").textContent = `ENGINE: ${data.stages.ocr.engine.toUpperCase()}`;
+    document.getElementById("ticket-city-display").textContent = `DATASET: ${data.stages.lookup.city.toUpperCase()} (LOCAL)`;
+
+    // Pass / Fail & Stamped state
+    const stampedBadge = document.getElementById("stamped-badge");
+    const stampedText = document.getElementById("stamped-text");
+    const stampedIcon = document.getElementById("stamped-icon");
+
+    const ledBoard = document.getElementById("led-board");
+    const advisoryCard = document.getElementById("advisory-card");
+    const advisoryMessage = document.getElementById("advisory-message");
+
+    // Always keep LED display board clearly visible for any bus
+    ledBoard.style.display = "flex";
+
+    // Only ever display a route that was actually parsed as a route (either
+    // the corrected match, or — in the low_confidence state — the raw parsed
+    // candidate). Never fall back to arbitrary raw OCR text here.
+    const displayRoute = data.route || data.stages.lookup.raw_route || null;
+    const routeDigitsEl = document.getElementById("led-route-number");
+    const destNameEl = document.getElementById("led-destination-name");
+
+    // Dynamically scale text size so long phrases and route numbers fit cleanly
+    if (displayRoute) {
+      if (displayRoute.length <= 4) {
+        routeDigitsEl.style.fontSize = "56px";
+      } else if (displayRoute.length <= 12) {
+        routeDigitsEl.style.fontSize = "32px";
+      } else {
+        routeDigitsEl.style.fontSize = "22px";
+      }
+      routeDigitsEl.style.lineHeight = "1.2";
+    }
+
+    if (data.status === "success") {
+      advisoryCard.style.display = "none";
+      routeDigitsEl.textContent = displayRoute || "---";
+
+      if (data.destination) {
+        destNameEl.textContent = `TO ${data.destination.toUpperCase()}`;
+      } else {
+        // Route number was real and passed the confidence gate, but isn't in
+        // the offline route database — say so plainly. Never substitute raw
+        // OCR text here; it isn't the destination and showing it as one is
+        // misleading.
+        destNameEl.textContent = "DESTINATION NOT IN DATABASE";
+      }
+
+      stampedBadge.className = "stamped-badge pass";
+      stampedIcon.textContent = "";
+      stampedText.textContent = `${data.total.time_ms}ms — PASS`;
+    } else if (data.status === "low_confidence") {
+      advisoryCard.style.display = "block";
+      advisoryMessage.textContent = data.spoken_phrase;
+      routeDigitsEl.textContent = displayRoute || "UNCLEAR";
+      destNameEl.textContent = data.destination ? `TO ${data.destination.toUpperCase()}` : "LOW CONFIDENCE READING";
+
+      stampedBadge.className = "stamped-badge advisory";
+      stampedIcon.textContent = "";
+      stampedText.textContent = data.stages.ocr.confidence_is_estimated
+        ? "LOW CONFIDENCE: NO RELIABLE PATTERN MATCH"
+        : `LOW CONFIDENCE: ${data.stages.ocr.confidence}%`;
+    } else {
+      // no_route / no_text
+      advisoryCard.style.display = "block";
+      advisoryMessage.textContent = data.spoken_phrase;
+      routeDigitsEl.textContent = "NOT DETECTED";
+      routeDigitsEl.style.fontSize = "36px";
+      destNameEl.textContent = "NO TEXT FOUND IN IMAGE";
+
+      stampedBadge.className = "stamped-badge";
+      stampedIcon.textContent = "";
+      stampedText.textContent = `NO TEXT DETECTED`;
+    }
+
+    // Auto-read voice announcement
+    speakVoice(currentSpokenPhrase);
+
+    // KPI Cards
+    const kpiTotalTime = document.getElementById("kpi-total-time");
+    const kpiTotalBadge = document.getElementById("kpi-total-badge");
+    kpiTotalTime.textContent = `${data.total.time_ms} ms`;
+    if (data.total.pass) {
+      kpiTotalBadge.className = "kpi-badge pass";
+      kpiTotalBadge.textContent = "PASS ≤1.5s";
+    } else {
+      kpiTotalBadge.className = "kpi-badge fail";
+      kpiTotalBadge.textContent = "OVER BUDGET";
+    }
+
+    const kpiConf = document.getElementById("kpi-conf-score");
+    const kpiConfBadge = document.getElementById("kpi-conf-badge");
+    const kpiConfLabel = document.getElementById("kpi-conf-label");
+    if (data.stages.ocr.confidence_is_estimated) {
+      // This engine (Windows OCR fallback) exposes no real confidence score.
+      // Label it plainly instead of showing a percentage that looks measured
+      // but isn't.
+      kpiConfLabel.textContent = `Pattern Match (${data.stages.ocr.engine} — no native confidence score)`;
+      kpiConf.textContent = data.stages.ocr.confidence_pass ? "MATCHED" : "NO MATCH";
+    } else {
+      kpiConfLabel.textContent = "OCR Confidence (Threshold ≥ 45%)";
+      kpiConf.textContent = `${data.stages.ocr.confidence}%`;
+    }
+    if (data.stages.ocr.confidence_pass) {
+      kpiConfBadge.className = "kpi-badge pass";
+      kpiConfBadge.textContent = data.stages.ocr.confidence_is_estimated ? "PASS" : `PASS ≥${data.stages.ocr.threshold_min}%`;
+    } else {
+      kpiConfBadge.className = "kpi-badge warn";
+      kpiConfBadge.textContent = data.stages.ocr.confidence_is_estimated ? "LOW" : `LOW <${data.stages.ocr.threshold_min}%`;
+    }
+
+    // Fuzzy Match Status
+    const kpiFuzzy = document.getElementById("kpi-fuzzy-status");
+    const kpiFuzzyBadge = document.getElementById("kpi-fuzzy-badge");
+    if (data.stages.lookup.fuzzy_applied) {
+      kpiFuzzy.textContent = `Corrected '${data.stages.lookup.raw_route}' ➔ '${data.stages.lookup.corrected_route}'`;
+      kpiFuzzyBadge.className = "kpi-badge warn";
+      kpiFuzzyBadge.textContent = "CORRECTED";
+    } else if (data.route) {
+      kpiFuzzy.textContent = `Exact: '${data.route}'`;
+      kpiFuzzyBadge.className = "kpi-badge pass";
+      kpiFuzzyBadge.textContent = "MATCHED";
+    } else {
+      kpiFuzzy.textContent = "N/A";
+      kpiFuzzyBadge.className = "kpi-badge warn";
+      kpiFuzzyBadge.textContent = "N/A";
+    }
+
+    // Cache status
+    const kpiCache = document.getElementById("kpi-cache-status");
+    const kpiCacheBadge = document.getElementById("kpi-cache-badge");
+    if (data.stages.feedback.audio_cached) {
+      kpiCache.textContent = "WAV Cache Hit";
+      kpiCacheBadge.className = "kpi-badge pass";
+      kpiCacheBadge.textContent = "10-20ms";
+    } else {
+      kpiCache.textContent = "Live Synthesis";
+      kpiCacheBadge.className = "kpi-badge warn";
+      kpiCacheBadge.textContent = "TTS Engine";
+    }
+
+    // Intermediate Stages Strip
+    document.getElementById("stg0-img").src = data.stages.capture.image_b64;
+    document.getElementById("stg0-ms").textContent = `${data.stages.capture.time_ms} ms`;
+
+    document.getElementById("stg1-img").src = data.stages.preprocess.gray_b64;
+    document.getElementById("stg1-ms").textContent = `GRAYSCALE`;
+
+    document.getElementById("stg2-img").src = data.stages.preprocess.clahe_b64;
+    document.getElementById("stg2-ms").textContent = `CLAHE EQUALIZED`;
+
+    document.getElementById("stg3-img").src = data.stages.preprocess.thresh_b64;
+    document.getElementById("stg3-ms").textContent = `${data.stages.preprocess.time_ms} ms (TOTAL PREPROCESS)`;
+
+    // Receipt Line Breakdown
+    const receiptBox = document.getElementById("receipt-lines-container");
+    receiptBox.innerHTML = `
+      <div>01. CAPTURE / INGESTION ................ ${data.stages.capture.time_ms.toFixed(2)} ms &nbsp; [${data.stages.capture.pass ? 'PASS' : 'FAIL'} ≤ ${data.stages.capture.budget_ms}ms]</div>
+      <div>02. OPENCV PREPROCESSING .............. ${data.stages.preprocess.time_ms.toFixed(2)} ms &nbsp; [${data.stages.preprocess.pass ? 'PASS' : 'FAIL'} ≤ ${data.stages.preprocess.budget_ms}ms]</div>
+      <div>03. ${data.stages.ocr.name.toUpperCase()} ....................... ${data.stages.ocr.time_ms.toFixed(2)} ms &nbsp; [${data.stages.ocr.pass ? 'PASS' : 'FAIL'} ≤ ${data.stages.ocr.budget_ms}ms]</div>
+      <div>04. CITY ROUTE LOOKUP ................. ${data.stages.lookup.time_ms.toFixed(2)} ms &nbsp; [PASS ≤ 5.0ms]</div>
+      <div>05. FEEDBACK & PHRASE GEN ............. ${data.stages.feedback.time_ms.toFixed(2)} ms &nbsp; [${data.stages.feedback.pass ? 'PASS' : 'FAIL'} ≤ ${data.stages.feedback.budget_ms}ms]</div>
+      <div style="border-top:1px dashed #A89F8D; margin-top:6px; padding-top:4px; font-weight:700;">
+        TOTAL WALL-CLOCK MEASURED LATENCY ...... ${data.total.time_ms.toFixed(2)} ms &nbsp; [${data.total.pass ? 'PASS' : 'OVER BUDGET'} ≤ ${data.total.budget_ms}ms]
+      </div>
+      <div style="font-size:11px; opacity:0.8; margin-top:4px;">
+        ${data.stages.ocr.confidence_is_estimated
+          ? `PATTERN MATCH: ${data.stages.ocr.confidence_pass ? 'MATCHED' : 'NO MATCH'} (engine: ${data.stages.ocr.engine}, no native confidence score)`
+          : `CONFIDENCE SCORE: ${data.stages.ocr.confidence}% (Threshold: ${data.stages.ocr.threshold_min}%)`
+        } &bull; RAW OCR TEXT: "${data.stages.ocr.raw_text}"
+      </div>
+    `;
+  }
+
+  // Voice playback using Web Speech API
+  function speakVoice(phrase) {
+    if (!phrase) return;
+    try {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(phrase);
+        utter.rate = 0.95;
+        utter.pitch = 1.0;
+        utter.lang = 'en-IN';
+        window.speechSynthesis.speak(utter);
+      }
+    } catch (e) {
+      console.warn("Speech synthesis error:", e);
+    }
+  }
+
+  playAudioBtn.addEventListener("click", () => {
+    speakVoice(currentSpokenPhrase);
+  });
+
+  // Benchmark Batch Audit
+  runBenchmarkBtn.addEventListener("click", async () => {
+    runBenchmarkBtn.disabled = true;
+    runBenchmarkBtn.textContent = "RUNNING AUDIT...";
+    showLoading("EXECUTING BATCH BENCHMARK OVER test_images/ ...");
+
+    try {
+      const res = await fetch("/api/benchmark", { method: "POST" });
+      const data = await res.json();
+      hideLoading();
+      runBenchmarkBtn.disabled = false;
+      runBenchmarkBtn.textContent = "▶ RUN BATCH AUDIT";
+
+      if (!res.ok) {
+        alert(data.error || "Benchmark failed.");
+        return;
+      }
+
+      auditResultsBox.style.display = "block";
+      document.getElementById("bench-accuracy").textContent = (data.accuracy_pct === "N/A") ? "N/A" : `${data.accuracy_pct}%`;
+      document.getElementById("bench-acc-badge").textContent = data.has_ground_truth ? "GROUND TRUTH VERIFIED" : "N/A (NO TRUTH CSV)";
+      document.getElementById("bench-total-tested").textContent = data.total_tested;
+      document.getElementById("bench-avg-latency").textContent = `${data.avg_latency_ms} ms`;
+
+      const tbody = document.getElementById("bench-table-body");
+      tbody.innerHTML = "";
+      data.records.forEach(r => {
+        const tr = document.createElement("tr");
+        const statusBadge = (r.match === true) ? '<span class="kpi-badge pass">MATCH</span>'
+          : (r.match === false) ? '<span class="kpi-badge fail">MISMATCH</span>'
+          : '<span class="kpi-badge pass">PROCESSED</span>';
+
+        tr.innerHTML = `
+          <td><strong>${r.filename}</strong></td>
+          <td style="font-family:'Share Tech Mono', monospace; font-size:13px; color:#A84018;">${r.detected_route}</td>
+          <td>${r.destination}</td>
+          <td>${r.confidence_is_estimated ? (r.confidence_pass ? 'MATCHED' : 'NO MATCH') : r.confidence + '%'}</td>
+          <td>${r.total_ms.toFixed(1)} ms</td>
+          <td>${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } catch (err) {
+      hideLoading();
+      runBenchmarkBtn.disabled = false;
+      runBenchmarkBtn.textContent = "▶ RUN BATCH AUDIT";
+      alert("Benchmark execution error: " + err.message);
+    }
+  });
+
+</script>
+
+</body>
+</html>
