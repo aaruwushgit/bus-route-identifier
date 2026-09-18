@@ -48,10 +48,85 @@ class OcrResult:
     confidence_is_estimated: bool = False
 
 
+_paddle_engine = None
+
+
+def _get_paddle_engine():
+    global _paddle_engine
+    if _paddle_engine is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _paddle_engine = RapidOCR()
+            logger.info("PaddleOCR (PP-OCRv4 ONNX Runtime) initialized successfully.")
+        except Exception as e:
+            logger.warning("PaddleOCR initialization failed: %s", e)
+            return None
+    return _paddle_engine
+
+
+def _extract_with_paddleocr(frame: np.ndarray) -> OcrResult:
+    t0 = time.monotonic()
+    engine = _get_paddle_engine()
+    if engine is None:
+        return OcrResult("", None, 0.0, "paddleocr_unavailable", time.monotonic() - t0)
+
+    try:
+        h, w = frame.shape[:2]
+        max_dim = max(h, w)
+        # Normalize excessively high-res camera captures (<= 1600 max dimension) for speed
+        if max_dim > 1600:
+            scale = 1600.0 / max_dim
+            proc_frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        else:
+            proc_frame = frame
+
+        res, _ = engine(proc_frame)
+
+        # In outdoor bus photos, scan the middle windshield band for route board placards
+        placard_res = []
+        if h > 1000 and w > 1000:
+            placard = frame[int(0.25 * h):int(0.55 * h), int(0.15 * w):int(0.85 * w)]
+            p_res, _ = engine(placard)
+            if p_res:
+                placard_res = p_res
+
+        all_detections = (res or []) + placard_res
+        if not all_detections:
+            return OcrResult("", None, 0.0, "paddleocr", time.monotonic() - t0)
+
+        lines = []
+        confidences = []
+        for line in all_detections:
+            text = line[1].strip()
+            score = float(line[2]) * 100.0
+            if text and text not in lines:
+                lines.append(text)
+                confidences.append(score)
+
+        raw_text = " ".join(lines)
+        mean_conf = sum(confidences) / len(confidences) if confidences else 0.0
+        route = _parse_route(raw_text)
+        elapsed = time.monotonic() - t0
+
+        return OcrResult(raw_text, route, mean_conf, "paddleocr", elapsed, confidence_is_estimated=False)
+    except Exception as e:
+        logger.error("PaddleOCR extraction error: %s", e, exc_info=True)
+        return OcrResult("", None, 0.0, "paddleocr_error", time.monotonic() - t0)
+
+
 def extract_route(binary_image: np.ndarray, raw_frame: Optional[np.ndarray] = None) -> OcrResult:
     """Run OCR + regex parsing, returning the best route match found."""
+    frame_to_use = raw_frame if raw_frame is not None else binary_image
+
+    if config.OCR_ENGINE == "paddleocr":
+        res = _extract_with_paddleocr(frame_to_use)
+        if res.engine not in ("paddleocr_unavailable", "paddleocr_error"):
+            return res
+        logger.info("PaddleOCR unavailable. Falling back to Tesseract...")
+
     if config.OCR_ENGINE == "easyocr":
         return _extract_with_easyocr(binary_image)
+
     return _extract_with_tesseract(binary_image, raw_frame=raw_frame)
 
 

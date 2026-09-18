@@ -59,7 +59,7 @@ UPSCALE_FACTOR = 1.0
 # --------------------------------------------------------------------------
 # OCR
 # --------------------------------------------------------------------------
-OCR_ENGINE = "tesseract"  # "tesseract" (recommended for Pi Zero 2 W) or "easyocr"
+OCR_ENGINE = "paddleocr"  # "paddleocr" (high accuracy PP-OCRv4), "tesseract", or "easyocr"
 
 
 def _detect_tesseract_cmd() -> str:

@@ -144,10 +144,13 @@ def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0) -> Dict
     destination = None
     low_confidence = False
 
+    if not raw_route and raw_text_clean:
+        inferred = route_lookup.resolve_route_from_text(raw_text_clean)
+        if inferred:
+            raw_route = inferred
+
     if raw_route:
-        # A route number was parsed by the real regex/pattern match in ocr_engine.py
-        # (e.g. 764, 11J, 398H, 42) — this is the ONLY path that should populate
-        # corrected_route. Per PRD FR-4.4, gate on OCR confidence before trusting it.
+        # A route number was parsed by the regex or resolved from destination text
         if ocr_result.confidence >= config.OCR_MIN_CONFIDENCE:
             corrected_route = route_lookup.correct_route(raw_route) or raw_route
             destination = route_lookup.lookup(corrected_route)

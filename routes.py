@@ -135,3 +135,20 @@ class RouteLookup:
             return close_all[0]
 
         return route
+
+    def resolve_route_from_text(self, raw_text: str) -> Optional[str]:
+        """Infers the route number if prominent destination names appear in the OCR text."""
+        if not raw_text:
+            return None
+        import re
+        text_upper = raw_text.upper()
+        all_routes = getattr(self, "all_cities_routes", self.routes)
+        best_match = None
+        best_score = 0
+        for r_num, dest in all_routes.items():
+            dest_words = [w.strip() for w in re.split(r'[\s,\-/()]+', dest.upper()) if len(w.strip()) >= 4]
+            matches = sum(1 for w in dest_words if w in text_upper)
+            if matches >= 2 and matches > best_score:
+                best_score = matches
+                best_match = r_num
+        return best_match
