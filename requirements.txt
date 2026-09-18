@@ -10,8 +10,8 @@ pytesseract>=0.3.10
 # rapidocr_onnxruntime>=1.4.0   # Optional local engine for PaddleOCR PP-OCRv4
 # tesseract-ocr binary itself is installed via apt/package manager — see guide
 
-# GPIO
-gpiozero>=2.0.1
+# GPIO (Only needed on physical Raspberry Pi hardware)
+# gpiozero>=2.0.1
 
 # Optional: only needed if config.OCR_ENGINE = "easyocr"
 # easyocr>=1.7.1

@@ -57,9 +57,7 @@ ADAPTIVE_THRESH_C = 12
 UPSCALE_FACTOR = 1.0
 
 # --------------------------------------------------------------------------
-# OCR
-# --------------------------------------------------------------------------
-OCR_ENGINE = "paddleocr"  # "paddleocr" (high accuracy PP-OCRv4), "tesseract", or "easyocr"
+OCR_ENGINE = "tesseract" if os.environ.get("VERCEL") else "paddleocr"
 
 
 def _detect_tesseract_cmd() -> str:

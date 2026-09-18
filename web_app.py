@@ -22,7 +22,6 @@ from flask import Flask, request, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 
 import config
-import feedback
 import ocr_engine
 import preprocessing
 from routes import RouteLookup
@@ -43,7 +42,6 @@ app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32MB max upload
 logger.info("Initializing RouteLookup for web service...")
 route_lookup = RouteLookup(routes_dir=config.ROUTES_DATA_DIR, city=config.CITY)
 route_lookup.startup_complete = True
-haptic = feedback.HapticMotor()
 
 # --- STARTUP OCR ENGINE CHECK ---
 # Print this loudly and unconditionally: if the server is silently running on
