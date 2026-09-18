@@ -91,7 +91,10 @@ def _encode_jpeg_base64(img: np.ndarray, max_dim: int = 640, quality: int = 80) 
     return "data:image/jpeg;base64," + base64.b64encode(buf).decode("utf-8")
 
 
-def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0) -> Dict[str, Any]:
+def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0,
+                              client_ocr_text: Optional[str] = None,
+                              client_ocr_conf: float = 0.0,
+                              client_ocr_ms: float = 0.0) -> Dict[str, Any]:
     """
     Runs the exact pipeline functions from the repository,
     measuring real wall-clock latency per stage and capturing
@@ -132,6 +135,22 @@ def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0) -> Dict
         logger.warning("OCR extraction exception: %s", e)
         ocr_result = ocr_engine.OcrResult("", None, 0.0, "ocr_error", time.monotonic() - t0)
     ocr_s = ocr_result.elapsed_s
+
+    # Fallback to client-side OCR if server OCR found nothing and client provided text
+    if not ocr_result.raw_text and client_ocr_text:
+        from ocr_engine import _parse_route
+        parsed_route = _parse_route(client_ocr_text)
+        conf_to_use = client_ocr_conf if client_ocr_conf > 0 else 85.0
+        elapsed_to_use = (client_ocr_ms / 1000.0) if client_ocr_ms > 0 else 0.45
+        ocr_result = ocr_engine.OcrResult(
+            raw_text=client_ocr_text,
+            route=parsed_route,
+            confidence=conf_to_use,
+            engine="client_wasm_tesseract",
+            elapsed_s=elapsed_to_use,
+            confidence_is_estimated=False,
+        )
+        ocr_s = ocr_result.elapsed_s
 
     # --- STAGE 3: LOOKUP & FUZZY CORRECTION ---
     t0 = time.monotonic()
@@ -184,7 +203,8 @@ def run_pipeline_instrumented(frame: np.ndarray, capture_s: float = 0.0) -> Dict
         haptic_name = "success_pattern (150ms single pulse)"
 
     # Check audio cache hit
-    cache_path = feedback._cache_path_for(corrected_route) if corrected_route else None
+    safe_name = corrected_route.replace("/", "-") if corrected_route else ""
+    cache_path = (config.AUDIO_CACHE_DIR / f"{safe_name}.wav") if safe_name else None
     is_cached = cache_path.exists() if cache_path else False
     feedback_s = time.monotonic() - t0
 
@@ -337,9 +357,25 @@ def identify_upload():
     if frame is None:
         return jsonify({"error": "Could not decode uploaded file as a valid image"}), 400
 
-    result = run_pipeline_instrumented(frame, capture_s=capture_s)
+    client_ocr_text = request.form.get("client_ocr_text", "").strip() or None
+    client_ocr_conf = float(request.form.get("client_ocr_conf", 0.0) or 0.0)
+    client_ocr_ms = float(request.form.get("client_ocr_ms", 0.0) or 0.0)
+
+    result = run_pipeline_instrumented(
+        frame, capture_s=capture_s,
+        client_ocr_text=client_ocr_text,
+        client_ocr_conf=client_ocr_conf,
+        client_ocr_ms=client_ocr_ms,
+    )
     result["filename"] = file.filename
     return jsonify(result)
+
+
+@app.route("/test_images/<path:filename>")
+def serve_test_image(filename):
+    """Serves sample images for client-side processing."""
+    from flask import send_from_directory
+    return send_from_directory(BASE_DIR / "test_images", filename)
 
 
 @app.route("/api/sample-identify", methods=["POST"])
@@ -361,9 +397,19 @@ def identify_sample():
     if frame is None:
         return jsonify({"error": f"Could not read image file '{filename}'"}), 400
 
-    result = run_pipeline_instrumented(frame, capture_s=capture_s)
+    client_ocr_text = data.get("client_ocr_text", "").strip() or None
+    client_ocr_conf = float(data.get("client_ocr_conf", 0.0) or 0.0)
+    client_ocr_ms = float(data.get("client_ocr_ms", 0.0) or 0.0)
+
+    result = run_pipeline_instrumented(
+        frame, capture_s=capture_s,
+        client_ocr_text=client_ocr_text,
+        client_ocr_conf=client_ocr_conf,
+        client_ocr_ms=client_ocr_ms,
+    )
     result["filename"] = safe_path.name
     return jsonify(result)
+
 
 
 @app.route("/api/benchmark", methods=["POST"])

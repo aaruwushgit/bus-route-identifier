@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Share+Tech+Mono&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <!-- In-browser WebAssembly OCR Engine for cloud serverless environments -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     :root {
@@ -1019,17 +1021,56 @@
     }
   });
 
+  async function runClientOcrFallback(imageSource) {
+    if (typeof Tesseract === "undefined") return null;
+    showLoading("SERVER OCR UNAVAILABLE IN CLOUD: RUNNING IN-BROWSER NEURAL OCR...");
+    try {
+      const t0 = performance.now();
+      const { data: ocrData } = await Tesseract.recognize(imageSource, 'eng');
+      const elapsedMs = performance.now() - t0;
+      const text = (ocrData && ocrData.text) ? ocrData.text.trim() : "";
+      const conf = (ocrData && ocrData.confidence) ? ocrData.confidence : 85.0;
+      return { text, conf, elapsedMs };
+    } catch (e) {
+      console.warn("Client Tesseract error:", e);
+      return null;
+    }
+  }
+
   async function uploadFile(file) {
     showLoading(`DECODING & RUNNING PIPELINE FOR ${file.name.toUpperCase()}...`);
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/identify", {
+      let res = await fetch("/api/identify", {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      let data = await res.json();
+
+      // If server returned no route (e.g. cloud serverless with no native OCR engine),
+      // run client-side WebAssembly OCR and submit the recognized text for full pipeline processing
+      if (res.ok && (data.status === "no_route" || !data.route)) {
+        const clientOcr = await runClientOcrFallback(file);
+        if (clientOcr && clientOcr.text) {
+          showLoading("RESOLVING ROUTE & DESTINATION FROM CLIENT OCR...");
+          const retryForm = new FormData();
+          retryForm.append("file", file);
+          retryForm.append("client_ocr_text", clientOcr.text);
+          retryForm.append("client_ocr_conf", clientOcr.conf.toFixed(1));
+          retryForm.append("client_ocr_ms", clientOcr.elapsedMs.toFixed(1));
+
+          const retryRes = await fetch("/api/identify", {
+            method: "POST",
+            body: retryForm,
+          });
+          if (retryRes.ok) {
+            data = await retryRes.json();
+          }
+        }
+      }
+
       hideLoading();
       if (!res.ok) {
         alert(data.error || "Pipeline run failed.");
@@ -1045,12 +1086,39 @@
   async function runSample(filename) {
     showLoading(`RUNNING PIPELINE ON ${filename.toUpperCase()}...`);
     try {
-      const res = await fetch("/api/sample-identify", {
+      let res = await fetch("/api/sample-identify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename }),
       });
-      const data = await res.json();
+      let data = await res.json();
+
+      // If server returned no route, run client OCR fallback on sample image
+      if (res.ok && (data.status === "no_route" || !data.route)) {
+        try {
+          const sampleBlob = await fetch(`/test_images/${filename}`).then(r => r.blob());
+          const clientOcr = await runClientOcrFallback(sampleBlob);
+          if (clientOcr && clientOcr.text) {
+            showLoading("RESOLVING ROUTE & DESTINATION FROM CLIENT OCR...");
+            const retryRes = await fetch("/api/sample-identify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                filename,
+                client_ocr_text: clientOcr.text,
+                client_ocr_conf: clientOcr.conf,
+                client_ocr_ms: clientOcr.elapsedMs,
+              }),
+            });
+            if (retryRes.ok) {
+              data = await retryRes.json();
+            }
+          }
+        } catch (sampleErr) {
+          console.warn("Sample client OCR error:", sampleErr);
+        }
+      }
+
       hideLoading();
       if (!res.ok) {
         alert(data.error || "Failed to process sample image.");

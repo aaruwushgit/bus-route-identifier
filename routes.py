@@ -145,10 +145,15 @@ class RouteLookup:
         all_routes = getattr(self, "all_cities_routes", self.routes)
         best_match = None
         best_score = 0
+        stop_words = {"ROAD", "GATE", "STOP", "STAND", "CITY", "TOWN", "MAIN", "NEAR", "STATION"}
         for r_num, dest in all_routes.items():
             dest_words = [w.strip() for w in re.split(r'[\s,\-/()]+', dest.upper()) if len(w.strip()) >= 4]
+            dest_words = [w for w in dest_words if w not in stop_words]
+            if not dest_words:
+                continue
             matches = sum(1 for w in dest_words if w in text_upper)
-            if matches >= 2 and matches > best_score:
+            has_strong_word = any(w in text_upper for w in dest_words if len(w) >= 6)
+            if (matches >= 2 or (matches >= 1 and has_strong_word)) and matches > best_score:
                 best_score = matches
                 best_match = r_num
         return best_match

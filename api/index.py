@@ -37,21 +37,8 @@ def app(environ, start_response):
 
     flask_instance, init_err = _get_flask_app()
     if init_err:
-        diag = [
-            "VERCEL INITIALIZATION ERROR:\n" + init_err,
-            f"Python: {sys.version}",
-            f"sys.path: {sys.path}",
-        ]
-        for p in sys.path:
-            if os.path.isdir(p):
-                try:
-                    entries = sorted(os.listdir(p))
-                    cv_matches = [e for e in entries if "cv" in e.lower() or "open" in e.lower() or "flask" in e.lower() or "numpy" in e.lower()]
-                    diag.append(f"In {p} (total {len(entries)} items): sample matching packages: {cv_matches}")
-                except Exception as e:
-                    diag.append(f"In {p}: error {e}")
         start_response("200 OK", [("Content-Type", "text/plain; charset=utf-8")])
-        return ["\n\n".join(diag).encode("utf-8")]
+        return [f"VERCEL INITIALIZATION ERROR:\n\n{init_err}".encode("utf-8")]
 
     target = None
 
