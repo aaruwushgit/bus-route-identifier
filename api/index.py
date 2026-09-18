@@ -7,7 +7,17 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from urllib.parse import parse_qs, urlencode, unquote
-from web_app import app
+try:
+    from web_app import app
+except Exception as e:
+    import traceback
+    _init_err = traceback.format_exc()
+    from flask import Flask, jsonify
+    app = Flask(__name__)
+    @app.route("/", defaults={"path": ""})
+    @app.route("/<path:path>")
+    def emergency_error(path):
+        return jsonify({"error": "Vercel Startup Error", "traceback": _init_err}), 500
 
 
 class VercelPathFix:
